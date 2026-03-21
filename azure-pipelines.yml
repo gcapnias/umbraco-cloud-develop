@@ -1,0 +1,53 @@
+# Disable automatic triggers
+trigger: none
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+- stage: Validate
+  displayName: 'Tests & Linting'
+  jobs:
+  - job: RunTests
+    steps:
+    - script: |
+        echo "Running automated tests..."
+        # Add your build/test commands here (e.g., dotnet test, npm test)
+        dotnet build
+      displayName: 'Execute Unit Tests'
+
+- stage: DeployToProduction
+  displayName: 'Merge to Main'
+  dependsOn: Validate
+  condition: succeeded()
+  jobs:
+  - deployment: MergeJob
+    environment: 'Production' # This is the key for manual approval
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+            persistCredentials: true
+            clean: true
+            fetchDepth: 0 # Get all history so we can merge branches
+          - script: |
+              # 1. Configure Identity
+              git config user.email "release-pipeline@dot-see.com"
+              git config user.name "Dot-See Release Pipeline"
+
+              # 2. Ensure we have the latest from remote
+              git fetch origin main
+              git fetch origin develop
+
+              # 3. Switch to main and ensure it tracks origin/main
+              git checkout main || git checkout -b main origin/main
+
+              # 4. Perform the merge
+              # Using 'origin/develop' ensures we get the latest pushed code
+              git merge origin/develop --no-ff -m "Pipeline automated release: develop → main"
+              
+              # 5. Push the changes
+              git push origin main
+            displayName: 'Merge `Develop` into `Main` branch'
