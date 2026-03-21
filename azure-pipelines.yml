@@ -34,8 +34,8 @@ stages:
             fetchDepth: 0 # Get all history so we can merge branches
           - script: |
               # 1. Configure Identity
-              git config user.email "release-pipeline@dot-see.com"
-              git config user.name "Dot-See Release Pipeline"
+              git config user.email "merge-pipeline@dot-see.com"
+              git config user.name "Acme's [Merge to Main] pipeline"
 
               # 2. Ensure we have the latest from remote
               git fetch origin main
@@ -46,7 +46,7 @@ stages:
 
               # 4. Perform the merge
               # Using 'origin/develop' ensures we get the latest pushed code
-              git merge origin/develop --no-ff -m "Pipeline automated release: develop → main"
+              git merge origin/develop --no-ff -m "Pipeline automated merge: develop → main"
               
               # 5. Push the changes
               git push origin main
