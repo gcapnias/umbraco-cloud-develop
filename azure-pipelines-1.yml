@@ -1,0 +1,60 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Replace with your actual GitHub Organization/Repository
+  GITHUB_REPO_PATH: "gcapnias/umbraco-cloud-develop" 
+
+steps:
+- checkout: self
+  persistCredentials: true
+  clean: true
+  fetchDepth: 0             # Get all history so we can merge branches
+
+- bash: |
+    set -e 
+
+    # 1. Setup Identity
+    git config --global user.email "sync-pipeline@dot-see.com"
+    git config --global user.name "Acme's [Sync to GitHub] pipeline"
+
+    # 2. Add GitHub Remote
+    # We use the token here for the remote URL
+    git remote add upstream "https://x-access-token:$(GITHUB_TOKEN)@github.com/$(GITHUB_REPO_PATH).git"
+    
+    # 3. Fetch latest from GitHub to ensure we have the history
+    git fetch upstream main
+
+    # 4. Create a unique Sync branch based on the current Azure DevOps main
+    SYNC_BRANCH="sync-hotfix-$(Build.BuildId)"
+    git checkout -b $SYNC_BRANCH
+
+    # 5. Merge GitHub main into our sync branch to handle any upstream changes
+    echo "Merging GitHub main into $SYNC_BRANCH..."
+    if git merge upstream/main --no-edit; then
+        echo "Merge successful."
+    else
+        echo "##vso[task.logissue type=error]Conflict detected! Manual resolution required."
+        exit 1
+    fi
+
+    # 6. Push the sync branch to GitHub
+    git push upstream $SYNC_BRANCH
+
+    # 7. Create the PR using GitHub CLI
+    # 'gh' uses GITHUB_TOKEN environment variable by default
+    echo "Creating Pull Request on GitHub..."
+    gh pr create \
+      --repo $(GITHUB_REPO_PATH) \
+      --base main \
+      --head $SYNC_BRANCH \
+      --title "Sync: Azure DevOps to GitHub ($(Build.BuildId))" \
+      --body "Automated sync `main` branch from Azure DevOps pipeline. Please review and merge."
+      
+  displayName: 'Sync to GitHub and Create PR'
+  env:
+    # Ensure GITHUB_TOKEN is defined in your Pipeline Library/Variables
+    GITHUB_TOKEN: $(GITHUB_TOKEN)
