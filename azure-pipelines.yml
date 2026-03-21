@@ -30,15 +30,24 @@ stages:
           steps:
           - checkout: self
             persistCredentials: true
+            clean: true
+            fetchDepth: 0 # Get all history so we can merge branches
           - script: |
+              # 1. Configure Identity
               git config user.email "release-pipeline@dot-see.com"
               git config user.name "Dot-See Release Pipeline"
-              
-              # Fetch and merge
+
+              # 2. Ensure we have the latest from remote
               git fetch origin main
-              git checkout main
+              git fetch origin develop
+
+              # 3. Switch to main and ensure it tracks origin/main
+              git checkout main || git checkout -b main origin/main
+
+              # 4. Perform the merge
+              # Using 'origin/develop' ensures we get the latest pushed code
               git merge origin/develop --no-ff -m "Pipeline automated release: develop → main"
               
-              # Push the changes back to main
+              # 5. Push the changes
               git push origin main
             displayName: 'Merge `Develop` into `Main` branch'
