@@ -17,19 +17,18 @@ steps:
 - bash: |
     set -e
 
-    # 1. Setup Identity
+    # 0. Setup Identity
     git config --global user.email "sync-pipeline@dot-see.com"
     git config --global user.name "Acme's [Sync to GitHub] pipeline"
 
-    TOKEN=$(GITHUB_TOKEN)
-    # 1. Authenticate with GitHub CLI
-    if [ -z "$TOKEN" ]; then
-        echo "Error: GH_TOKEN environment variable is not set."
+    # 1. Validate Token implicitly
+    # Instead of logging in, we check if we can reach the API
+    if ! gh api user --quiet; then
+        echo "Error: Could not validate GITHUB_TOKEN. Ensure it is exported and has 'repo' scopes."
         exit 1
     fi
 
-    echo "Authenticating..."
-    gh auth login --with-token
+    echo "Authentication successful for user: $(gh api user -q .login)"
 
     # 2. Define/Verify the 'upstream' remote
     if ! git remote | grep -q "upstream"; then
