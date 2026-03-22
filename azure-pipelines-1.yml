@@ -36,6 +36,10 @@ steps:
     if ! git remote | grep -q "upstream"; then
         echo "Remote 'upstream' not found. Adding it now..."
         git remote add upstream "https://github.com/$(GITHUB_REPO_PATH).git"
+
+        # 2. Tell Git to use GitHub CLI as its credential helper
+        # The --hostname flag ensures it only affects GitHub.com traffic
+        gh auth setup-git --hostname github.com
     else
         echo "Remote 'upstream' already exists."
     fi
