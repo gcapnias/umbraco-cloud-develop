@@ -1,12 +1,10 @@
 trigger: none
-pr: none
 
 pool:
   vmImage: "ubuntu-latest"
 
 variables:
   # Replace with your actual GitHub Organization/Repository
-  DEVOPS_REPO_BRANCH: "main"
   GITHUB_REPO_BRANCH: "main"
   GITHUB_REPO_PATH: "gcapnias/umbraco-cloud-develop"
 
@@ -47,22 +45,40 @@ steps:
       fi
 
       # 3. Fetch latest from GitHub to ensure we have the history
-      git fetch origin $DEVOPS_REPO_BRANCH
-      git fetch upstream $GITHUB_REPO_BRANCH
+      git fetch origin main
+      git fetch upstream $(GITHUB_REPO_BRANCH)
 
-      # 4. Select branch to receive git pull
-      git checkout -b $DEVOPS_REPO_BRANCH
+      # 4. Create a unique Sync branch based on the current Azure DevOps main
+      git checkout main
+      SYNC_BRANCH="sync-upstream-$(Build.BuildId)"
+      git checkout -b $SYNC_BRANCH
 
-      # 5. Merge GitHub [$GITHUB_REPO_BRANCH] into our [$DEVOPS_REPO_BRANCH] branch to handle any upstream changes
-      echo "Merging GitHub [$GITHUB_REPO_BRANCH] into [$DEVOPS_REPO_BRANCH]..."
-      if git merge upstream/$GITHUB_REPO_BRANCH -m "Automated merge: GitHub [upstream/$(GITHUB_REPO_BRANCH)] → [$(DEVOPS_REPO_BRANCH)] (Build $(Build.BuildId))" --no-edit; then
+      # 5. Merge GitHub [$(GITHUB_REPO_BRANCH)] into our sync branch to handle any upstream changes
+      echo "Merging GitHub [$(GITHUB_REPO_BRANCH)] into [$SYNC_BRANCH]..."
+
+      # We use '-X ours' to automatically resolve conflicts by favoring our version.
+      # If you prefer their GitHub version to win, use '-X theirs' instead.
+      if git merge upstream/$(GITHUB_REPO_BRANCH) --no-edit -X ours; then
           echo "Merge successful."
       else
           echo "##vso[task.logissue type=error]Conflict detected! Manual resolution required."
           exit 1
       fi
 
-    displayName: "Pull from GitHub [$GITHUB_REPO_BRANCH] into [$DEVOPS_REPO_BRANCH]"
+      # 6. Push the sync branch to GitHub
+      git push upstream $SYNC_BRANCH
+
+      # 7. Create the PR using GitHub CLI
+      # 'gh' uses GITHUB_TOKEN environment variable by default
+      echo "Creating Pull Request on GitHub [$(GITHUB_REPO_BRANCH)]..."
+      gh pr create \
+        --repo $(GITHUB_REPO_PATH) \
+        --base $(GITHUB_REPO_BRANCH) \
+        --head $SYNC_BRANCH \
+        --title "Synchronization from Dot-See DevOps to GitHub [$(GITHUB_REPO_BRANCH)] ($(Build.BuildId))" \
+        --body "Automated PR from Dot-See DevOps. Please review and merge."
+
+    displayName: "Sync to GitHub and Create PR"
     env:
       # Ensure GITHUB_TOKEN is defined in your Pipeline Library/Variables
       GITHUB_TOKEN: $(GITHUB_TOKEN)

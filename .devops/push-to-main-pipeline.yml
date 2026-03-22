@@ -1,0 +1,53 @@
+# Disable automatic triggers
+trigger: none
+pr: none
+
+pool:
+  vmImage: "ubuntu-latest"
+
+stages:
+  - stage: ValidatePullRequest
+    displayName: "Validate PR"
+    jobs:
+      - job: RunBuild
+        displayName: "Build solution"
+        steps:
+          - script: |
+              echo "Running solution build..."
+              dotnet build
+            displayName: "Build solution"
+
+  - stage: DeployToMain
+    displayName: "Merge code to [main] branch"
+    dependsOn: ValidatePullRequest
+    condition: succeeded()
+    jobs:
+      - deployment: MergeCodeJob
+        environment: "Production" # This is the key for manual approval
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  persistCredentials: true
+                  clean: true
+                  fetchDepth: 0 # Get all history so we can merge branches
+                - script: |
+                    # 1. Configure Identity
+                    git config --global user.email "devops@dot-see.com"
+                    git config --global user.name "Dot-See DevOps"
+
+                    # 2. Ensure we have the latest from remote
+                    git fetch origin main
+                    git fetch origin develop
+
+                    # 3. Force local main to match origin/main
+                    git checkout -B main origin/main
+
+                    # 4. Perform the merge
+                    # Using 'origin/develop' ensures we get the latest pushed code
+                    git merge origin/develop --no-ff -m "Automated merge: [develop] → [main] (Build $(Build.BuildId))"
+
+                    # 5. Push the changes
+                    git push origin main
+                  displayName: "Merge `[develop]` into `[main]` branch"
