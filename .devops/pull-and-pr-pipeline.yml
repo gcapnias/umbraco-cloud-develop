@@ -1,0 +1,88 @@
+trigger: none
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  # Replace with your actual GitHub Organization/Repository
+  GITHUB_REPO_PATH: "gcapnias/umbraco-cloud-develop"
+
+steps:
+  - checkout: self
+    persistCredentials: true
+    clean: true
+    fetchDepth: 0 # Get all history so we can merge branches
+
+  - bash: |
+      set -e
+
+      # 0. Setup Identity
+      git config --global user.email "pull-pipeline@dot-see.com"
+      git config --global user.name "[Pull from GitHub] pipeline"
+
+      # 1. Validate the Token using the correct flag
+      echo "Validating GITHUB_TOKEN..."
+      if ! gh api user --silent; then
+          echo "Error: GITHUB_TOKEN is invalid or expired."
+          echo "Check your token scopes (needs 'repo') and ensure it is exported."
+          exit 1
+      fi
+
+      USER_NAME=$(gh api user --jq '.login')
+      echo "Authenticated as: $USER_NAME"
+
+      # 2. Define/Verify the 'upstream' remote
+      if ! git remote | grep -q "upstream"; then
+          echo "Remote 'upstream' not found. Adding it now..."
+          git remote add upstream "https://github.com/$(GITHUB_REPO_PATH).git"
+
+          # 2. Tell Git to use GitHub CLI as its credential helper
+          # The --hostname flag ensures it only affects GitHub.com traffic
+          gh auth setup-git --hostname github.com
+      else
+          echo "Remote 'upstream' already exists."
+      fi
+
+      # 3. Fetch latest from GitHub to ensure we have the history
+      git fetch origin main
+      git fetch upstream main
+
+      # 4. Select branch to receive git pull
+      SYNC_BRANCH="pull-github-$(Build.BuildId)"
+      git checkout -b $SYNC_BRANCH
+
+      # 5. Merge GitHub [main] into our temporary branch
+      echo "Merging GitHub main into $SYNC_BRANCH..."
+      if git merge upstream/main --no-edit -X theirs; then
+          echo "Merge successful (conflicts resolved automatically using 'theirs')."
+      else
+          echo "##vso[task.logissue type=error]Critical Merge Conflict: Automatic resolution failed."
+          exit 1
+      fi
+
+      # 6. Push the sync branch to Azure Repos (origin)
+      echo "Pushing $SYNC_BRANCH to origin..."
+      git push origin $SYNC_BRANCH
+
+      # 7. Create the Pull Request in Azure DevOps
+      echo "Creating Pull Request..."
+
+      # Set the Organization and Project context for the CLI
+      # This uses variable AZURE_DEVOPS_EXT_PAT available in the pipeline
+      PR_URL=$(az repos pr create \
+          --repository "$(Build.Repository.Name)" \
+          --source-branch "$SYNC_BRANCH" \
+          --target-branch "main" \
+          --title "Sync from GitHub [Build $(Build.BuildId)]" \
+          --description "Automated synchronization from GitHub upstream/main into Azure Repos." \
+          --query "repository.url" -o tsv)
+
+      echo "Pull Request created successfully!"
+
+      # This allows you to see the PR URL in the pipeline logs
+      echo "You can view the PR at: $PR_URL"
+
+    displayName: "Pull from GitHub and create PR for [main]"
+    env:
+      AZURE_DEVOPS_EXT_PAT: $(System.AccessToken)
+      GITHUB_TOKEN: $(GITHUB_TOKEN)
