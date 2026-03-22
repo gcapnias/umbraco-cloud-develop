@@ -16,6 +16,7 @@ stages:
       inputs:
         packageType: 'sdk'
         version: '10.0.x'
+        useGlobalJson: true
     - script: |
         echo "Running build validation..."
         dotnet build
@@ -53,11 +54,11 @@ stages:
               # 4. Perform the merge
               # Using 'origin/develop' ensures we get the latest pushed code
               if ! git merge origin/develop --no-ff -m "Pipeline automated merge: develop → main"; then
-                echo "##[error] Merge failed - conflicts detected. Aborting."
-                git merge --abort
+                echo "##vso[task.logissue type=error]Merge failed while merging origin/develop into main; see logs for details. Aborting pipeline."
+                git merge --abort || true
                 exit 1
               fi
-              
+
               # 5. Push the changes
               git push origin main
             displayName: 'Merge `Develop` into `Main` branch'
