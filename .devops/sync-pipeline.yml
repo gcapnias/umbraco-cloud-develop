@@ -7,7 +7,7 @@ pool:
 variables:
   # Replace with your actual GitHub Organization/Repository
   GITHUB_REPO_PATH: "gcapnias/umbraco-cloud-develop" 
-  SYNC_BRANCH="main"
+  SYNC_BRANCH: "main"
 
 steps:
 - checkout: self
@@ -20,7 +20,7 @@ steps:
 
     # 0. Setup Identity
     git config --global user.email "pull-pipeline@dot-see.com"
-    git config --global user.name "Acme's [Pull to GitHub] pipeline"
+    git config --global user.name "Acme's [Pull from GitHub] pipeline"
 
     # 1. Validate the Token using the correct flag
     echo "Validating GITHUB_TOKEN..."
