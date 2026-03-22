@@ -21,14 +21,16 @@ steps:
     git config --global user.email "sync-pipeline@dot-see.com"
     git config --global user.name "Acme's [Sync to GitHub] pipeline"
 
-    # 1. Validate Token implicitly
-    # Instead of logging in, we check if we can reach the API
-    if ! gh api user --quiet; then
-        echo "Error: Could not validate GITHUB_TOKEN. Ensure it is exported and has 'repo' scopes."
+    # 1. Validate the Token using the correct flag
+    echo "Validating GITHUB_TOKEN..."
+    if ! gh api user --silent; then
+        echo "Error: GITHUB_TOKEN is invalid or expired."
+        echo "Check your token scopes (needs 'repo') and ensure it is exported."
         exit 1
     fi
 
-    echo "Authentication successful for user: $(gh api user -q .login)"
+    USER_NAME=$(gh api user --jq '.login')
+    echo "Authenticated as: $USER_NAME"
 
     # 2. Define/Verify the 'upstream' remote
     if ! git remote | grep -q "upstream"; then
