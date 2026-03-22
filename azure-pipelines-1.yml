@@ -1,8 +1,7 @@
-trigger:
-- main
+trigger: none
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: "ubuntu-latest"
 
 variables:
   # Replace with your actual GitHub Organization/Repository
@@ -19,7 +18,7 @@ steps:
 
     # 0. Setup Identity
     git config --global user.email "sync-pipeline@dot-see.com"
-    git config --global user.name "Acme's [Sync to GitHub] pipeline"
+    git config --global user.name "[Sync to GitHub] pipeline"
 
     # 1. Validate the Token using the correct flag
     echo "Validating GITHUB_TOKEN..."
@@ -49,12 +48,15 @@ steps:
     git fetch upstream main
 
     # 4. Create a unique Sync branch based on the current Azure DevOps main
-    SYNC_BRANCH="sync-hotfix-$(Build.BuildId)"
+    SYNC_BRANCH="sync-upstream-$(Build.BuildId)"
     git checkout -b $SYNC_BRANCH
 
     # 5. Merge GitHub main into our sync branch to handle any upstream changes
     echo "Merging GitHub main into $SYNC_BRANCH..."
-    if git merge upstream/main --no-edit; then
+
+    # We use '-X ours' to automatically resolve conflicts by favoring our version.
+    # If you prefer their GitHub version to win, use '-X theirs' instead.
+    if git merge upstream/main --no-edit -X ours; then
         echo "Merge successful."
     else
         echo "##vso[task.logissue type=error]Conflict detected! Manual resolution required."
