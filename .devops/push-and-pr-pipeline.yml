@@ -49,7 +49,6 @@ steps:
       git fetch upstream $(GITHUB_REPO_BRANCH)
 
       # 4. Create a unique Sync branch based on the current Azure DevOps main
-      git checkout main
       SYNC_BRANCH="sync-upstream-$(Build.BuildId)"
       git checkout -b $SYNC_BRANCH
 
