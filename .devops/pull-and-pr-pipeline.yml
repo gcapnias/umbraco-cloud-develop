@@ -51,12 +51,12 @@ steps:
       SYNC_BRANCH="pull-github-$(Build.BuildId)"
       git checkout -b $SYNC_BRANCH
 
-      # 5. Merge GitHub [main] into our [main] branch to handle any upstream changes
+      # 5. Merge GitHub [main] into our temporary branch
       echo "Merging GitHub main into $SYNC_BRANCH..."
-      if git merge upstream/main --no-edit; then
-          echo "Merge successful."
+      if git merge upstream/main --no-edit -X theirs; then
+          echo "Merge successful (conflicts resolved automatically using 'theirs')."
       else
-          echo "##vso[task.logissue type=error]Conflict detected! Manual resolution required."
+          echo "##vso[task.logissue type=error]Critical Merge Conflict: Automatic resolution failed."
           exit 1
       fi
 
