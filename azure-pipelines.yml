@@ -33,6 +33,8 @@ stages:
             clean: true
             fetchDepth: 0 # Get all history so we can merge branches
           - script: |
+              set -euo pipefail
+
               # 1. Configure Identity
               git config user.email "merge-pipeline@dot-see.com"
               git config user.name "Acme's [Merge to Main] pipeline"
