@@ -1,0 +1,67 @@
+trigger:
+- none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Replace with your actual GitHub Organization/Repository
+  GITHUB_REPO_PATH: "gcapnias/umbraco-cloud-develop" 
+  SYNC_BRANCH="main"
+
+steps:
+- checkout: self
+  persistCredentials: true
+  clean: true
+  fetchDepth: 0             # Get all history so we can merge branches
+
+- bash: |
+    set -e
+
+    # 0. Setup Identity
+    git config --global user.email "pull-pipeline@dot-see.com"
+    git config --global user.name "Acme's [Pull to GitHub] pipeline"
+
+    # 1. Validate the Token using the correct flag
+    echo "Validating GITHUB_TOKEN..."
+    if ! gh api user --silent; then
+        echo "Error: GITHUB_TOKEN is invalid or expired."
+        echo "Check your token scopes (needs 'repo') and ensure it is exported."
+        exit 1
+    fi
+
+    USER_NAME=$(gh api user --jq '.login')
+    echo "Authenticated as: $USER_NAME"
+
+    # 2. Define/Verify the 'upstream' remote
+    if ! git remote | grep -q "upstream"; then
+        echo "Remote 'upstream' not found. Adding it now..."
+        git remote add upstream "https://github.com/$(GITHUB_REPO_PATH).git"
+
+        # 2. Tell Git to use GitHub CLI as its credential helper
+        # The --hostname flag ensures it only affects GitHub.com traffic
+        gh auth setup-git --hostname github.com
+    else
+        echo "Remote 'upstream' already exists."
+    fi
+
+    # 3. Fetch latest from GitHub to ensure we have the history
+    git fetch origin main
+    git fetch upstream main
+
+    # 4. Select branch to receive git pull
+    git checkout -b $SYNC_BRANCH
+
+    # 5. Merge GitHub [main] into our [main] branch to handle any upstream changes
+    echo "Merging GitHub main into $SYNC_BRANCH..."
+    if git merge upstream/main --no-edit; then
+        echo "Merge successful."
+    else
+        echo "##vso[task.logissue type=error]Conflict detected! Manual resolution required."
+        exit 1
+    fi
+
+  displayName: 'Pull from GitHub into [main]'
+  env:
+    # Ensure GITHUB_TOKEN is defined in your Pipeline Library/Variables
+    GITHUB_TOKEN: $(GITHUB_TOKEN)
