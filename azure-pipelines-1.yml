@@ -15,17 +15,32 @@ steps:
   fetchDepth: 0             # Get all history so we can merge branches
 
 - bash: |
-    set -e 
+    set -e
 
     # 1. Setup Identity
     git config --global user.email "sync-pipeline@dot-see.com"
     git config --global user.name "Acme's [Sync to GitHub] pipeline"
 
-    # 2. Add GitHub Remote
-    # We use the token here for the remote URL
-    git remote add upstream "https://x-access-token:$(GITHUB_TOKEN)@github.com/$(GITHUB_REPO_PATH).git"
-    
+    TOKEN=$(GITHUB_TOKEN)
+    # 1. Authenticate with GitHub CLI
+    if [ -z "$TOKEN" ]; then
+        echo "Error: GH_TOKEN environment variable is not set."
+        exit 1
+    fi
+
+    echo "Authenticating..."
+    echo "$TOKEN" | gh auth login --with-token
+
+    # 2. Define/Verify the 'upstream' remote
+    if ! git remote | grep -q "upstream"; then
+        echo "Remote 'upstream' not found. Adding it now..."
+        git remote add upstream "https://github.com/$(GITHUB_REPO_PATH).git"
+    else
+        echo "Remote 'upstream' already exists."
+    fi
+
     # 3. Fetch latest from GitHub to ensure we have the history
+    git fetch origin main
     git fetch upstream main
 
     # 4. Create a unique Sync branch based on the current Azure DevOps main
