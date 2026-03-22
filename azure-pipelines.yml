@@ -11,6 +11,11 @@ stages:
   jobs:
   - job: RunTests
     steps:
+    - task: UseDotNet@2
+      displayName: 'Install .NET SDK'
+      inputs:
+        packageType: 'sdk'
+        useGlobalJson: true
     - script: |
         echo "Running build validation..."
         # Add your build commands here (e.g., dotnet build)
