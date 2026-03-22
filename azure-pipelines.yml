@@ -50,7 +50,7 @@ stages:
               # Using 'origin/develop' ensures we get the latest pushed code
               if ! git merge origin/develop --no-ff -m "Pipeline automated merge: develop → main"; then
                 echo "##vso[task.logissue type=error]Merge failed while merging origin/develop into main; see logs for details. Aborting pipeline."
-                git merge --abort
+                git merge --abort || true
                 exit 1
               fi
 
