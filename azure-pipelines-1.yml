@@ -29,7 +29,7 @@ steps:
     fi
 
     echo "Authenticating..."
-    echo "$TOKEN" | gh auth login --with-token
+    gh auth login --with-token
 
     # 2. Define/Verify the 'upstream' remote
     if ! git remote | grep -q "upstream"; then
